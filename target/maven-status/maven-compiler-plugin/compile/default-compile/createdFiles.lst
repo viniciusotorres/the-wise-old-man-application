@@ -1,0 +1,8 @@
+com\example\the_wise_old_man\TheWiseOldManApplication.class
+com\example\the_wise_old_man\controller\PlayerController.class
+com\example\the_wise_old_man\repository\PlayerRepository.class
+com\example\the_wise_old_man\service\players\PlayersService.class
+com\example\the_wise_old_man\model\Player.class
+com\example\the_wise_old_man\dto\players\PlayerByIdDTO.class
+com\example\the_wise_old_man\dto\responses\ResponseDTO.class
+com\example\the_wise_old_man\dto\players\PlayerDTO.class
