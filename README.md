@@ -22,7 +22,7 @@
 
 ### Segurança e Configuração
 
-- **Spring Security** (futuro): Para autenticação e autorização, se necessário.
+- **Spring Security**: Configurado para autenticação e autorização utilizando JWT (JSON Web Tokens).
 
 ## Configuração
 
