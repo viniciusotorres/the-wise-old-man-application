@@ -28,6 +28,12 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        // Ignorar conexões WebSocket
+        if ("/ws".equals(request.getRequestURI())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         //--> Recupera o Token do cabeçalho
         var token = this.recoverToken(request);
         //-> Valida o Token

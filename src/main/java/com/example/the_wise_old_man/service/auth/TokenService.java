@@ -24,7 +24,12 @@ public class TokenService {
             String token = JWT.create()
                     .withIssuer("login-auth")
                     .withSubject(player.getEmail())
+                    .withClaim("username", player.getUsername())
+                    .withClaim("xp", player.getXp())
+                    .withClaim("level", player.getLevel())
+                    .withClaim("rank", player.getRank())
                     .withClaim("id", player.getId())
+                    .withClaim("nextLevel", player.getXpToNextLevel())
                     .withExpiresAt(this.generateExpirationDate())
                     .sign(algorithm);
             return token;

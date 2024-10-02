@@ -2,6 +2,7 @@ package com.example.the_wise_old_man.service.auth;
 
 import com.example.the_wise_old_man.dto.players.PlayerAuthDTO;
 import com.example.the_wise_old_man.dto.responses.ResponseAuthDTO;
+import com.example.the_wise_old_man.exception.AuthenticationException;
 import com.example.the_wise_old_man.repository.PlayerRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,13 +24,13 @@ public class AuthService {
 
     public ResponseEntity<ResponseAuthDTO> login(PlayerAuthDTO playerLoginDTO) {
         var player = playerRepository.findByEmail(playerLoginDTO.email())
-                .orElseThrow(() -> new RuntimeException("Player Not Found"));
+                .orElseThrow(() -> new AuthenticationException("Player Not Found"));
 
         if (passwordEncoder.matches(playerLoginDTO.password(), player.getPassword())) {
             var token = tokenService.generateToken(player);
             return ResponseEntity.ok(new ResponseAuthDTO(player.getUsername(), token, "Login efetuado com sucesso", HttpStatus.OK.value()));
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ResponseAuthDTO(null, null, "Invalid credentials", HttpStatus.UNAUTHORIZED.value()));
+        throw new AuthenticationException("Invalid credentials");
     }
 }

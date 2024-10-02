@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Chat Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.2/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        .chat-container {
+            display: flex;
+        }
+        .chat-box {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+        }
+        .message-input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        .message {
+            margin-bottom: 10px;
+        }
+        .message.user1 {
+            color: blue;
+            text-align: right;
+            background-color: #e0f7fa;
+            margin-left: auto;
+            margin-right: 0;
+        }
+
+        .message.user2 {
+            color: green;
+            text-align: left;
+            background-color: #f1f8e9;
+            margin-left: 0;
+            margin-right: auto;
+        }
+        .message-info {
+            font-size: 0.8em;
+            color: #999;
+        }
+        .conversation-list {
+            width: 200px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        .conversation-item {
+            cursor: pointer;
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        .conversation-item:hover {
+            background-color: #f0f0f0;
+        }
+        .user-list {
+            margin-top: 10px;
+        }
+        .user-item {
+            cursor: pointer;
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        .user-item:hover {
+            background-color: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+<h1>WebSocket Chat Test</h1>
+<div>
+    <h2>Logged in as: <span id="loggedInUser"></span></h2>
+</div>
+<div class="chat-container">
+    <div class="conversation-list" id="conversationList">
+        <h3>Conversations</h3>
+        <!-- Conversations will be populated here -->
+    </div>
+    <div>
+        <h2>Chat</h2>
+        <h3 id="chatWith">Conversando com: </h3>
+        <div id="chatBox" class="chat-box"></div>
+        <div id="userList" class="user-list">
+            <!-- Users will be populated here -->
+        </div>
+        <input type="text" id="messageInput" class="message-input" placeholder="Type a message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    const socket = new SockJS('/ws');
+    const stompClient = Stomp.over(socket);
+    let currentConversation = null;
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    const authToken = localStorage.getItem('authToken');
+    document.getElementById('loggedInUser').textContent = loggedInUser;
+
+    stompClient.connect({}, function (frame) {
+        console.log('Connected: ' + frame);
+        loadConversations();
+        loadPlayers();
+    }, function (error) {
+        console.error('Error connecting: ' + error);
+    });
+
+    function loadConversations() {
+        fetch('/chat/conversations', {
+            headers: {
+                'Authorization': 'Bearer ' + authToken
+            }
+        })
+            .then(response => response.json())
+            .then(conversations => {
+                const conversationList = document.getElementById('conversationList');
+                conversationList.innerHTML = '<h3>Conversations</h3>';
+                conversations.forEach(conversation => {
+                    const item = document.createElement('div');
+                    item.classList.add('conversation-item');
+                    item.textContent = `Conversation with ${conversation.player1.username === loggedInUser ? conversation.player2.username : conversation.player1.username}`;
+                    item.onclick = () => selectConversation(conversation.id);
+                    conversationList.appendChild(item);
+                });
+            })
+            .catch(error => console.error('Error loading conversations:', error));
+    }
+
+    function loadPlayers() {
+        fetch('/players/players', {
+            headers: {
+                'Authorization': 'Bearer ' + authToken
+            }
+        })
+            .then(response => response.json())
+            .then(players => {
+                const userList = document.getElementById('userList');
+                userList.innerHTML = '<h3>Users</h3>';
+                players.forEach(player => {
+                    const item = document.createElement('div');
+                    item.classList.add('user-item');
+                    item.textContent = player.email;
+                    item.onclick = () => startConversation(player.email);
+                    userList.appendChild(item);
+                });
+            })
+            .catch(error => console.error('Error loading players:', error));
+    }
+
+    function startConversation(recipientEmail) {
+        fetch(`/chat/conversations`, {
+            headers: {
+                'Authorization': 'Bearer ' + authToken
+            }
+        })
+            .then(response => response.json())
+            .then(conversations => {
+                let conversation = conversations.find(conversation =>
+                    (conversation.player1.email === loggedInUser && conversation.player2.email === recipientEmail) ||
+                    (conversation.player1.email === recipientEmail && conversation.player2.email === loggedInUser)
+                );
+
+                if (!conversation) {
+                    // Create a new conversation if it doesn't exist
+                    fetch('/chat/conversations', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + authToken
+                        },
+                        body: JSON.stringify({
+                            player1: { email: loggedInUser },
+                            player2: { email: recipientEmail }
+                        })
+                    })
+                        .then(response => response.json())
+                        .then(newConversation => {
+                            currentConversation = newConversation.id;
+                            document.getElementById('chatWith').textContent = `Conversando com: ${recipientEmail}`;
+                            loadMessages(newConversation.id);
+                        })
+                        .catch(error => console.error('Error creating conversation:', error));
+                } else {
+                    currentConversation = conversation.id;
+                    document.getElementById('chatWith').textContent = `Conversando com: ${recipientEmail}`;
+                    loadMessages(conversation.id);
+                }
+            })
+            .catch(error => console.error('Error loading conversations:', error));
+    }
+
+    function loadMessages(conversationId) {
+        fetch(`/chat/conversations/${conversationId}/messages`, {
+            headers: {
+                'Authorization': 'Bearer ' + authToken
+            }
+        })
+            .then(response => response.json())
+            .then(conversation => {
+                const messages = conversation.messages;
+                if (Array.isArray(messages)) {
+                    const chatBox = document.getElementById('chatBox');
+                    chatBox.innerHTML = '';
+                    messages.forEach(message => {
+                        showMessage(message.content, message.sender, message.timestamp);
+                    });
+
+                    // Unsubscribe from any previous conversation topic
+                    if (stompClient.subscription) {
+                        stompClient.subscription.unsubscribe();
+                    }
+
+                    // Connect to WebSocket and subscribe to the conversation topic
+                    stompClient.subscription = stompClient.subscribe('/topic/messages/' + conversationId, function (message) {
+                        const messageBody = JSON.parse(message.body);
+                        showMessage(messageBody.content, messageBody.sender, messageBody.timestamp);
+                    });
+                } else {
+                    console.error('Error: Expected an array of messages');
+                }
+            })
+            .catch(error => console.error('Error loading messages:', error));
+    }
+
+    function selectConversation(conversationId) {
+        currentConversation = conversationId;
+        fetch(`/chat/conversations/${conversationId}/messages`, {
+            headers: {
+                'Authorization': 'Bearer ' + authToken
+            }
+        })
+            .then(response => response.json())
+            .then(conversation => {
+                console.log('Messages response:', conversation); // Log the response
+                const messages = conversation.messages; // Access the messages array
+                if (Array.isArray(messages)) {
+                    const chatBox = document.getElementById('chatBox');
+                    chatBox.innerHTML = '';
+                    messages.forEach(message => {
+                        showMessage(message.content, message.sender, message.timestamp);
+                    });
+
+                    // Unsubscribe from any previous conversation topic
+                    if (stompClient.subscription) {
+                        stompClient.subscription.unsubscribe();
+                    }
+
+                    // Connect to WebSocket and subscribe to the conversation topic
+                    stompClient.subscription = stompClient.subscribe('/topic/messages/' + currentConversation, function (message) {
+                        const messageBody = JSON.parse(message.body);
+                        showMessage(messageBody.content, messageBody.sender, messageBody.timestamp);
+                    });
+                } else {
+                    console.error('Error: Expected an array of messages');
+                }
+            })
+            .catch(error => console.error('Error loading messages:', error));
+    }
+
+    function sendMessage() {
+        const messageInput = document.getElementById('messageInput');
+        const message = messageInput.value;
+        const recipient = document.getElementById('chatWith').textContent.split(': ')[1];
+        stompClient.send("/app/chat.sendMessage", {}, JSON.stringify({
+            'content': message,
+            'sender': loggedInUser,
+            'recipientUsername': recipient,
+            'conversationId': currentConversation
+        }));
+        messageInput.value = '';
+    }
+
+    function showMessage(content, sender, timestamp) {
+        const chatBox = document.getElementById('chatBox');
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+
+        // Determine if the message is from the logged-in user or the other user
+        if (sender === loggedInUser) {
+            messageElement.classList.add('user1');
+            messageElement.style.textAlign = 'right';
+        } else {
+            messageElement.classList.add('user2');
+            messageElement.style.textAlign = 'left';
+        }
+
+        const contentElement = document.createElement('p');
+        contentElement.textContent = content;
+
+        const infoElement = document.createElement('p');
+        infoElement.textContent = `Sent by ${sender} at ${new Date(timestamp).toLocaleString()}`;
+        infoElement.classList.add('message-info');
+
+        messageElement.appendChild(contentElement);
+        messageElement.appendChild(infoElement);
+
+        chatBox.appendChild(messageElement);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // Initial load of conversations and players
+    loadConversations();
+    loadPlayers();
+</script>
+</body>
+</html>

@@ -1,6 +1,9 @@
 package com.example.the_wise_old_man.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,9 +12,11 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "TB_PLAYER")
+@Valid
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,13 +27,16 @@ public class Player {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column( nullable = false)
+    @Column(nullable = false)
+    @NotBlank(message = "Username is mandatory")
     private String username;
 
     @Column(nullable = false)
+    @NotBlank(message = "Username is mandatory")
     private String email;
 
     @Column(nullable = false)
+    @NotBlank(message = "Password is mandatory")
     private String password;
 
     @Column(nullable = false)
@@ -43,7 +51,6 @@ public class Player {
     @Column(nullable = false)
     private int xpToNextLevel;
 
-
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -51,6 +58,14 @@ public class Player {
     @LastModifiedDate
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "player1")
+    @JsonIgnore
+    private List<Conversation> conversationsAsPlayer1;
+
+    @OneToMany(mappedBy = "player2")
+    @JsonIgnore
+    private List<Conversation> conversationsAsPlayer2;
 
     @PrePersist
     public void prePersist() {
@@ -62,6 +77,4 @@ public class Player {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-
-
 }
