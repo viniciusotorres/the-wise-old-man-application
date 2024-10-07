@@ -7,6 +7,8 @@ import com.example.the_wise_old_man.dto.players.PlayerDTO;
 import com.example.the_wise_old_man.dto.responses.ResponseDTO;
 import com.example.the_wise_old_man.model.Player;
 import com.example.the_wise_old_man.repository.PlayerRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,6 +21,7 @@ import java.util.TreeMap;
 
 @Service
 public class PlayersService {
+    private static final Logger logger = LoggerFactory.getLogger(PlayersService.class);
 
     private static final Map<Integer, String> LEVEL_RANK_MAP = new TreeMap<>();
     private static final int INITIAL_XP_TO_NEXT_LEVEL = 100;
@@ -46,19 +49,47 @@ public class PlayersService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    /**
+     * Cria um novo jogador.
+     *
+     * @param player DTO contendo os dados do jogador
+     * @return Resposta com dados do jogador ou mensagem de erro
+     */
     @Transactional
     public ResponseEntity<ResponseAuthDTO> createPlayer(PlayerDTO player) {
+        validatePlayerData(player);
+
         if (playerRepository.existsByUsername(player.username())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ResponseAuthDTO(null,null,"Já existe jogador com esse nome", HttpStatus.CONFLICT.value()));
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new ResponseAuthDTO(null, null, "Já existe jogador com esse nome", HttpStatus.CONFLICT.value()));
         }
 
         try {
             Player newPlayer = convertToEntity(player);
             playerRepository.save(newPlayer);
             String token = tokenService.generateToken(newPlayer);
-            return ResponseEntity.status(HttpStatus.CREATED).body(new ResponseAuthDTO(player.username(),token, "Jogador criado", HttpStatus.CREATED.value()));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(new ResponseAuthDTO(player.username(), token, "Jogador criado", HttpStatus.CREATED.value()));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ResponseAuthDTO(null,null,"Erro ao criar jogador", HttpStatus.INTERNAL_SERVER_ERROR.value()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ResponseAuthDTO(null, null, "Erro ao criar jogador", HttpStatus.INTERNAL_SERVER_ERROR.value()));
+        }
+    }
+
+    /**
+     * Valida os dados do jogador.
+     *
+     * @param player DTO do jogador
+     */
+    private void validatePlayerData(PlayerDTO player) {
+        if (player.username() == null || player.username().isEmpty()) {
+            throw new IllegalArgumentException("Nome de usuário é obrigatório");
+        }
+        if (player.email() == null || !player.email().matches("^[\\w-.]+@([\\w-]+\\.)+[\\w-]{2,4}$")) {
+            throw new IllegalArgumentException("Email inválido");
+        }
+        if (player.password() == null || player.password().length() < 6) {
+            throw new IllegalArgumentException("A senha deve ter pelo menos 6 caracteres");
         }
     }
 
@@ -76,12 +107,25 @@ public class PlayersService {
         return newPlayer;
     }
 
+    /**
+     * Obtém um jogador pelo ID.
+     *
+     * @param id ID do jogador
+     * @return Resposta com dados do jogador ou mensagem de erro
+     */
     public ResponseEntity<PlayerByIdDTO> getPlayerById(Long id) {
         return playerRepository.findById(id)
                 .map(player -> ResponseEntity.ok(new PlayerByIdDTO(player.getUsername(), player.getEmail(), player.getXp(), player.getLevel(), player.getRank(), player.getXpToNextLevel())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(null));
     }
 
+    /**
+     * Atualiza a experiência de um jogador.
+     *
+     * @param id ID do jogador
+     * @param xp XP a ser adicionado
+     * @return Resposta com sucesso ou mensagem de erro
+     */
     @Transactional
     public ResponseEntity<ResponseDTO> updateXpOfPlayer(Long id, int xp) {
         return playerRepository.findById(id)
