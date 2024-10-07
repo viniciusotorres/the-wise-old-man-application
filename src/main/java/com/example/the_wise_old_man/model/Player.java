@@ -1,6 +1,5 @@
 package com.example.the_wise_old_man.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +11,6 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Table(name = "TB_PLAYER")
@@ -58,14 +56,6 @@ public class Player {
     @LastModifiedDate
     @Column(nullable = false)
     private LocalDateTime updatedAt;
-
-    @OneToMany(mappedBy = "player1")
-    @JsonIgnore
-    private List<Conversation> conversationsAsPlayer1;
-
-    @OneToMany(mappedBy = "player2")
-    @JsonIgnore
-    private List<Conversation> conversationsAsPlayer2;
 
     @PrePersist
     public void prePersist() {
